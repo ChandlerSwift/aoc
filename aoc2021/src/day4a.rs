@@ -61,7 +61,6 @@ impl Board {
             for cell in row {
                 if !cell.called {
                     score += cell.value as u32; // https://stackoverflow.com/a/44552464
-                    println!("{}", score);
                 }
             }
         }
@@ -87,7 +86,6 @@ fn main() {
     let mut boards: Vec<Board> = Vec::new();
     for board_string in board_strings {
         boards.push(parse_board(board_string));
-        println!("{}", boards[boards.len() - 1]);
     }
 
     let mut winning_board = None;
@@ -96,7 +94,6 @@ fn main() {
         number = number_string.parse().unwrap();
         for i in 0..boards.len() {
             boards[i].apply_move(number);
-            println!("{}", boards[i]);
             if check_win(boards[i]) {
                 winning_board = Some(boards[i]);
                 break;
@@ -225,7 +222,6 @@ mod tests {
         let mut boards: Vec<Board> = Vec::new();
         for board_string in RAW_BOARDS.split("\n\n") {
             boards.push(parse_board(board_string));
-            println!("{}", boards[boards.len() - 1]);
         }
     
         let mut winning_board = None;
@@ -234,7 +230,6 @@ mod tests {
             number = number_string.parse().unwrap();
             for i in 0..boards.len() {
                 boards[i].apply_move(number);
-                println!("{}", boards[i]);
                 if check_win(boards[i]) {
                     winning_board = Some(boards[i]);
                     break;
