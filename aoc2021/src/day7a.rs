@@ -44,7 +44,7 @@ mod tests {
     const INPUT: &str ="16,1,2,0,4,2,7,1,2,14";
 
     #[test]
-    fn test_count_fish() {
+    fn test_find_best_crab_position() {
         let mut inputs = Vec::new();
         for input in INPUT.trim().split(",") {
             inputs.push(input.parse().unwrap());
