@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 
-fn identify_digits(combinations: Vec<&str>, currently_displayed: Vec<&str>) -> String {
+fn identify_digits(_combinations: Vec<&str>, currently_displayed: Vec<&str>) -> String {
     let mut ret = String::new();
 
     for digit in currently_displayed {

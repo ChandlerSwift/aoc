@@ -10,13 +10,6 @@ struct Packet {
 }
 
 impl Packet {
-    fn get_version_sum(&self) -> u64 {
-        let mut version_sum = self.version as u64;
-        for subpacket in &self.subpackets {
-            version_sum += subpacket.get_version_sum();
-        }
-        version_sum
-    }
 
     fn fmt_with_indentation(&self, f: &mut fmt::Formatter<'_>, indentation_level: u8) -> fmt::Result {
         for _ in 0..indentation_level {

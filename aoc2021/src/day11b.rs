@@ -1,6 +1,5 @@
 use std::env;
 use std::fs;
-use std::collections::VecDeque;
 
 fn parse_input(input: &str) -> Vec<Vec<u8>> {
     let mut octopodes = Vec::new();
@@ -106,7 +105,6 @@ fn find_first_round_where_all_flash_simultaneously(mut octopodes: Vec<Vec<u8>>) 
             return round;
         }
     }
-    panic!("Returned from infinite loop");
 }
 
 fn main() {

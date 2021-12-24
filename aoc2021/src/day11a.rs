@@ -1,6 +1,5 @@
 use std::env;
 use std::fs;
-use std::collections::VecDeque;
 
 fn parse_input(input: &str) -> Vec<Vec<u8>> {
     let mut octopodes = Vec::new();
@@ -18,11 +17,11 @@ fn simulate_rounds(mut octopodes: Vec<Vec<u8>>, rounds: u32) -> u32 {
     let height = octopodes.len();
     let width = octopodes[0].len();
     let mut number_fired = 0;
-    for round in 0..rounds {
+    for _round in 0..rounds {
         let mut fired_octopodes: Vec<Vec<bool>> = Vec::new();
         for row in &octopodes {
             let mut fired_row = Vec::new();
-            for octopus in row {
+            for _octopus in row {
                 fired_row.push(false);
             }
             fired_octopodes.push(fired_row);

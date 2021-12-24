@@ -11,6 +11,7 @@ fn max_y(initial_y_velocity: i32) -> i32 {
     return y(initial_y_velocity, initial_y_velocity);
 }
 
+#[allow(dead_code)]
 fn x(t: i32, initial_velocity: i32) -> i32 {
     if t >= initial_velocity {
         t*(t+1)/2
