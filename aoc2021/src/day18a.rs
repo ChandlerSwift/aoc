@@ -11,6 +11,31 @@ struct SnailfishNumber {
     pair_right: Option<Box<SnailfishNumber>>,
 }
 
+#[derive(Clone, PartialEq, Eq, Debug)]
+enum TokenType {
+    LeftBracket,
+    RightBracket,
+    Comma,
+    Number
+}
+
+#[derive(Clone, Debug)]
+struct Token {
+    token_type: TokenType,
+    value: Option<u32>,
+}
+
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.token_type {
+            TokenType::LeftBracket => write!(f, "["),
+            TokenType::RightBracket => write!(f, "]"),
+            TokenType::Comma => write!(f, ","),
+            TokenType::Number => write!(f, "{}", self.value.unwrap()),
+        }
+    }
+}
+
 impl fmt::Display for SnailfishNumber {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.regular_number.is_some() {
@@ -69,88 +94,141 @@ impl SnailfishNumber {
         }
     }
 
-    fn reduce_with_depth<'a>(&'a mut self, depth: u32) -> (bool, Option<(u32, u32)>) {
-        // > If any pair is nested inside four pairs, the leftmost such pair
-        // > explodes.
-        //
-        // > To explode a pair, the pair's left value is added to the first
-        // > regular number to the left of the exploding pair (if any) and the
-        // > pair's right value is added to the first regular number to the
-        // > right of the exploding pair (if any). Exploding pairs will always
-        // > consist of two regular numbers.
-        if depth > 3 {
-            if self.pair_left.is_some() {
-                // boom!
-                let old_left = self.pair_left.as_ref().unwrap().regular_number.unwrap();
-                let old_right = self.pair_right.as_ref().unwrap().regular_number.unwrap();
-                self.regular_number = Some(0);
-                self.pair_left = None;
-                self.pair_right = None;
-                return (true, Some((old_left, old_right)));
-            }
-        } else {
-            // recursively check other numbers to explode/reduce
-            if self.pair_left.is_some() {
-                let (reduced, mut exploded) = self.pair_left.as_mut().unwrap().reduce_with_depth(depth + 1);
-                if reduced {
-                    if exploded.is_some() && self.pair_right.as_ref().unwrap().regular_number.is_some() {
-                        let previous_right = self.pair_right.as_ref().unwrap().regular_number.unwrap();
-                        let right_to_add = exploded.unwrap().1;
-                        self.pair_right.as_mut().unwrap().regular_number = Some(previous_right + right_to_add);
-                        exploded.as_mut().unwrap().1 = 0;
-                    }
-                    return (true, exploded);
-                }
-            }
-            if self.pair_right.is_some() {
-                let (reduced, mut exploded) = self.pair_right.as_mut().unwrap().reduce_with_depth(depth + 1);
-                if reduced {
-                    if exploded.is_some() && self.pair_left.as_ref().unwrap().regular_number.is_some() {
-                        let previous_left = self.pair_left.as_ref().unwrap().regular_number.unwrap();
-                        let left_to_add = exploded.unwrap().0;
-                        self.pair_left.as_mut().unwrap().regular_number = Some(previous_left + left_to_add);
-                        exploded.as_mut().unwrap().0 = 0;
-                    }
-                    return (true, exploded);
-                }
-            }
-        }
+    fn tokenize(&self) -> Vec<Token> {
+        let mut vec = Vec::new();
+        let self_str = self.to_string();
+        let mut char_iter = self_str.chars().peekable(); // https://stackoverflow.com/a/62190290
 
-        // > To split a regular number, replace it with a pair; the left element
-        // > of the pair should be the regular number divided by two and rounded
-        // > down, while the right element of the pair should be the regular
-        // > number divided by two and rounded up. For example, 10 becomes
-        // > [5,5], 11 becomes [5,6], 12 becomes [6,6], and so on.
-        if self.regular_number.is_some() && self.regular_number.unwrap() > 9 {
-            self.pair_left = Some(Box::new(SnailfishNumber{
-                regular_number: Some(self.regular_number.unwrap() / 2),
-                pair_left: None,
-                pair_right: None,
-            }));
-            self.pair_right = Some(Box::new(SnailfishNumber{
-                regular_number: Some((self.regular_number.unwrap() + 1) / 2),
-                pair_left: None,
-                pair_right: None,
-            }));
-            self.regular_number = None;
-            return (true, None);
+        while let Some(c) = char_iter.next() {
+            vec.push(match c {
+                '[' => Token{
+                    token_type: TokenType::LeftBracket,
+                    value: None,
+                },
+                ']' => Token{
+                    token_type: TokenType::RightBracket,
+                    value: None,
+                },
+                ',' => Token{
+                    token_type: TokenType::Comma,
+                    value: None,
+                },
+                d => { // Anything else should be a number, possibly with multiple digits
+                    let mut s = String::new();
+                    s.push(d);
+                    while char_iter.peek().is_some() && char_iter.peek().unwrap().is_ascii_digit() {
+                        s.push(char_iter.next().unwrap());
+                    }
+                    Token{
+                        token_type: TokenType::Number,
+                        value: Some(s.parse().unwrap()),
+                    }
+                },
+            });
         }
-
-        (false, None)
+        vec
     }
 
     fn reduce(&mut self) {
         let mut reduced = true;
         while reduced {
-            let (new_reduced, _) = self.reduce_with_depth(0);
-            reduced = new_reduced;
+            reduced = false;
+            let tokens = self.tokenize();
+            let mut new_tokens = Vec::new();
+            let mut depth = 0;
+            let mut token_iter = 0..tokens.len();
+            while let Some(i) = token_iter.next() {
+                match tokens[i].token_type {
+                    TokenType::LeftBracket => {
+                        if depth < 4 {
+                            depth += 1;
+                        } else if depth == 4 {
+                            // boom!
+                            reduced = true;
+                            // Take the pair off the stack:
+                            let left = tokens[token_iter.next().unwrap()].clone();
+                            assert_eq!(left.token_type, TokenType::Number);
+                            assert_eq!(tokens[token_iter.next().unwrap()].token_type, TokenType::Comma);
+                            let mut right = tokens[token_iter.next().unwrap()].clone();
+                            assert_eq!(right.token_type, TokenType::Number);
+                            assert_eq!(tokens[token_iter.next().unwrap()].token_type, TokenType::RightBracket);
+                            // replace it with a zero:
+                            new_tokens.push(Token{
+                                token_type: TokenType::Number,
+                                value: Some(0),
+                            });
+                            // propagate them to the left:
+                            for j in (0..i).rev() {
+                                if tokens[j].token_type == TokenType::Number {
+                                    let new_value = tokens[j].value.unwrap() + left.value.unwrap();
+                                    new_tokens[j].value = Some(new_value);
+                                    break;
+                                }
+                            }
+                            // and right: -- this is kinda hacky; I could easily use the existing iterator! TODO
+                            while let Some(j) = token_iter.next() { // This also copies over the rest of the tokens
+                                if tokens[j].token_type == TokenType::Number {
+                                    let mut new_token = tokens[j].clone();
+                                    let new_value = new_token.value.unwrap() + right.value.unwrap();
+                                    new_token.value = Some(new_value);
+                                    new_tokens.push(new_token);
+                                    right.value = Some(0);
+                                } else {
+                                    new_tokens.push(tokens[j].clone());
+                                }
+                            }
+                            break;
+                        } else {
+                            panic!("Exceeded max expected depth");
+                        }
+                    },
+                    TokenType::RightBracket => {
+                        depth -= 1;
+                    }
+                    TokenType::Comma => {
+                    },
+                    TokenType::Number => {
+                    },
+                }
+                new_tokens.push(tokens[i].clone());
+            }
+            assert_eq!(token_iter.next(), None);
+
+            if !reduced { // We could also try splitting:
+                let tokens = new_tokens;
+                new_tokens = Vec::new();
+                for token in tokens {
+                    if token.value.is_some() && token.value.unwrap() > 9 && !reduced {
+                        new_tokens.push(Token{token_type: TokenType::LeftBracket, value: None});
+                        new_tokens.push(Token{token_type: TokenType::Number, value: Some(token.value.unwrap() / 2)});
+                        new_tokens.push(Token{token_type: TokenType::Comma, value: None});
+                        new_tokens.push(Token{token_type: TokenType::Number, value: Some((token.value.unwrap() + 1) / 2)});
+                        new_tokens.push(Token{token_type: TokenType::RightBracket, value: None});
+                        reduced = true;
+                    } else {
+                        new_tokens.push(token.clone());
+                    }
+                }
+            }
+
+            let mut new_str = String::new();
+            for token in new_tokens {
+                new_str.push_str(&token.to_string());
+            }
+            let new_self = SnailfishNumber::from_string(&new_str);
+            self.regular_number = new_self.regular_number;
+            self.pair_left = new_self.pair_left;
+            self.pair_right = new_self.pair_right;
+
         }
     }
 
     fn magnitude(&self) -> u32 {
-        self.regular_number.unwrap_or(
+        if self.regular_number.is_some() {
+            self.regular_number.unwrap()
+        } else {
             3 * self.pair_left.as_ref().unwrap().magnitude() + 2 * self.pair_right.as_ref().unwrap().magnitude()
-        )
+        }
     }
 }
 
@@ -363,11 +441,154 @@ mod tests {
         ];
 
         for i in 0..examples.len() {
+            println!("Trying {}", examples[i]);
             let mut sn = SnailfishNumber::from_string(&String::from(examples[i]));
             sn.reduce();
-            println!("Trying {}", examples[i]);
             assert_eq!(sn.to_string(), solutions[i]);
         }
     }
 
+    #[test]
+    fn test_add() {
+        let addend1 = "[[[[4,3],4],4],[7,[[8,4],9]]]";
+        let addend2 = "[1,1]";
+        let sn1 = SnailfishNumber::from_string(&String::from(addend1));
+        let sn2 = SnailfishNumber::from_string(&String::from(addend2));
+        let sum = sn1+sn2;
+        assert_eq!(sum.to_string(), "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]");
+    }
+
+    #[test]
+    fn test_add_all1() {
+        let raw_numbers = vec![
+            "[1,1]",
+            "[2,2]",
+            "[3,3]",
+            "[4,4]",
+        ];
+        let mut numbers = Vec::new();
+        for raw_number in raw_numbers {
+            numbers.push(SnailfishNumber::from_string(&String::from(raw_number)));
+        }
+        let sum: SnailfishNumber = numbers.iter().sum();
+        assert_eq!(sum.to_string(), "[[[[1,1],[2,2]],[3,3]],[4,4]]");
+    }
+
+    #[test]
+    fn test_add_all2() {
+        let raw_numbers = vec![
+            "[1,1]",
+            "[2,2]",
+            "[3,3]",
+            "[4,4]",
+            "[5,5]",
+        ];
+        let mut numbers = Vec::new();
+        for raw_number in raw_numbers {
+            numbers.push(SnailfishNumber::from_string(&String::from(raw_number)));
+        }
+        let sum: SnailfishNumber = numbers.iter().sum();
+        assert_eq!(sum.to_string(), "[[[[3,0],[5,3]],[4,4]],[5,5]]");
+    }
+
+    #[test]
+    fn test_add_all3() {
+        let raw_numbers = vec![
+            "[1,1]",
+            "[2,2]",
+            "[3,3]",
+            "[4,4]",
+            "[5,5]",
+            "[6,6]",
+        ];
+        let mut numbers = Vec::new();
+        for raw_number in raw_numbers {
+            numbers.push(SnailfishNumber::from_string(&String::from(raw_number)));
+        }
+        let sum: SnailfishNumber = numbers.iter().sum();
+        assert_eq!(sum.to_string(), "[[[[5,0],[7,4]],[5,5]],[6,6]]");
+    }
+
+    #[test]
+    fn test_add_all4() {
+        let raw_numbers = "
+        [[[0,[4,5]],[0,0]],[[[4,5],[2,6]],[9,5]]]
+        [7,[[[3,7],[4,3]],[[6,3],[8,8]]]]
+        [[2,[[0,8],[3,4]]],[[[6,7],1],[7,[1,6]]]]
+        [[[[2,4],7],[6,[0,5]]],[[[6,8],[2,8]],[[2,1],[4,5]]]]
+        [7,[5,[[3,8],[1,4]]]]
+        [[2,[2,2]],[8,[8,1]]]
+        [2,9]
+        [1,[[[9,3],9],[[9,0],[0,7]]]]
+        [[[5,[7,4]],7],1]
+        [[[[4,2],2],6],[8,7]]
+        ";
+
+
+        let mut numbers = Vec::new();
+
+        for line in raw_numbers.trim().split("\n") {
+            numbers.push(SnailfishNumber::from_string(&String::from(line.trim())));
+        }
+
+        let sum: SnailfishNumber = numbers.iter().sum();
+        assert_eq!(sum.to_string(), "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]");
+    }
+
+    #[test]
+    fn test_magnitude() {
+        let inputs = vec![
+            "[9,1]",
+            "[1,9]",
+            "[[9,1],[1,9]]",
+            "[[1,2],[[3,4],5]]",
+            "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]",
+            "[[[[1,1],[2,2]],[3,3]],[4,4]]",
+            "[[[[3,0],[5,3]],[4,4]],[5,5]]",
+            "[[[[5,0],[7,4]],[5,5]],[6,6]]",
+            "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]",
+        ];
+        let magnitudes = vec![
+            29,
+            21,
+            129,
+            143,
+            1384,
+            445,
+            791,
+            1137,
+            3488,
+        ];
+
+        for i in 0..inputs.len() {
+            let sn = SnailfishNumber::from_string(&String::from(inputs[i]));
+            assert_eq!(sn.magnitude(), magnitudes[i]);
+        }
+    }
+
+    #[test]
+    fn test_assignment() {
+        let raw_numbers = "
+        [[[0,[5,8]],[[1,7],[9,6]]],[[4,[1,2]],[[1,4],2]]]
+        [[[5,[2,8]],4],[5,[[9,9],0]]]
+        [6,[[[6,2],[5,6]],[[7,6],[4,7]]]]
+        [[[6,[0,7]],[0,9]],[4,[9,[9,0]]]]
+        [[[7,[6,4]],[3,[1,3]]],[[[5,5],1],9]]
+        [[6,[[7,3],[3,2]]],[[[3,8],[5,7]],4]]
+        [[[[5,4],[7,7]],8],[[8,3],8]]
+        [[9,3],[[9,9],[6,[4,9]]]]
+        [[2,[[7,7],7]],[[5,8],[[9,3],[0,2]]]]
+        [[[[5,2],5],[8,[3,7]]],[[5,[7,5]],[4,4]]]
+        ";
+
+        let mut numbers = Vec::new();
+
+        for line in raw_numbers.trim().split("\n") {
+            numbers.push(SnailfishNumber::from_string(&String::from(line.trim())));
+        }
+
+        let sum: SnailfishNumber = numbers.iter().sum();
+        assert_eq!(sum.to_string(), "[[[[6,6],[7,6]],[[7,7],[7,0]]],[[[7,7],[7,7]],[[7,8],[9,9]]]]");
+        assert_eq!(sum.magnitude(), 4140);
+    }
 }
