@@ -7,3 +7,7 @@ it.
 ```
 cargo run --bin day1a inputs/1a.txt
 ```
+
+### Required Rust version
+In general, I've been running with Rust 1.56. Day 18 requires Rust nightly for a
+destructuring assignment. Days 19+ were tested with Rust 1.57.
