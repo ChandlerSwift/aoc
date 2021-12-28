@@ -142,7 +142,8 @@ impl SnailfishNumber {
     fn reduce(&mut self) {
         let mut reduced = true;
         while reduced {
-            (reduced, _) = self.reduce_with_depth(0);
+            let (new_reduced, _) = self.reduce_with_depth(0);
+            reduced = new_reduced;
         }
     }
 
