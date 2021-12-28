@@ -69,72 +69,50 @@ impl SnailfishNumber {
         }
     }
 
-    fn reduce_with_depth<'a>(&'a mut self, depth: u32) -> bool {
-        // If any pair is nested inside four pairs, the leftmost such pair
-        // explodes.
-        if depth >= 3 {
-            println!("depth >= 3");
-            if self.pair_left.is_some() && self.pair_left.as_ref().unwrap().pair_left.is_some() {
-                println!("Exploding pair {}", self);
-                // the left item of this pair is also a pair, so it needs to be exploded
-                let exploding_pair = *self.pair_left.as_ref().unwrap().clone();
-                // > Exploding pairs will always consist of two regular numbers.
-                //
-                // > To explode a pair, the pair's left value is added to the
-                // > first regular number to the left of the exploding pair (if
-                // > any)...
-                // There will be none, because this number is on the left of its
-                // pair.
-                // > ...and the pair's right value is added to the first regular
-                // > number to the right of the exploding pair (if any).
-                let exploding_fragment = *exploding_pair.pair_right.unwrap();
-                let explodes_onto = *self.pair_right.as_ref().unwrap().clone();
-                self.pair_right = Some(Box::new(SnailfishNumber{
-                    regular_number: Some(exploding_fragment.regular_number.unwrap() + explodes_onto.regular_number.unwrap()),
-                    pair_left: None,
-                    pair_right: None,
-                }));
-                // > Then, the entire exploding pair is replaced with the
-                // > regular number 0.
-                self.pair_left = Some(Box::new(SnailfishNumber{
-                    regular_number: Some(0),
-                    pair_left: None,
-                    pair_right: None,
-                }));
-                println!("Exploded pair {}", self);
-                return true;
-            } else if self.pair_right.is_some() && self.pair_right.as_ref().unwrap().pair_left.is_some() {
-                println!("Exploding pair {}", self);
-                // as above
-                let exploding_pair = *self.pair_right.as_ref().unwrap().clone();
-                let exploding_fragment = *exploding_pair.pair_left.unwrap();
-                let explodes_onto = *self.pair_left.as_ref().unwrap().clone();
-                self.pair_left = Some(Box::new(SnailfishNumber{
-                    regular_number: Some(exploding_fragment.regular_number.unwrap() + explodes_onto.regular_number.unwrap()),
-                    pair_left: None,
-                    pair_right: None,
-                }));
-                // > Then, the entire exploding pair is replaced with the
-                // > regular number 0.
-                self.pair_right = Some(Box::new(SnailfishNumber{
-                    regular_number: Some(0),
-                    pair_left: None,
-                    pair_right: None,
-                }));
-                println!("Exploded pair {}", self);
-                return true;
+    fn reduce_with_depth<'a>(&'a mut self, depth: u32) -> (bool, Option<(u32, u32)>) {
+        // > If any pair is nested inside four pairs, the leftmost such pair
+        // > explodes.
+        //
+        // > To explode a pair, the pair's left value is added to the first
+        // > regular number to the left of the exploding pair (if any) and the
+        // > pair's right value is added to the first regular number to the
+        // > right of the exploding pair (if any). Exploding pairs will always
+        // > consist of two regular numbers.
+        if depth > 3 {
+            if self.pair_left.is_some() {
+                // boom!
+                let old_left = self.pair_left.as_ref().unwrap().regular_number.unwrap();
+                let old_right = self.pair_right.as_ref().unwrap().regular_number.unwrap();
+                self.regular_number = Some(0);
+                self.pair_left = None;
+                self.pair_right = None;
+                return (true, Some((old_left, old_right)));
             }
-        }
-        if self.pair_left.is_some() {
-            let to_reduce = self.pair_left.as_mut().unwrap();
-            if to_reduce.reduce_with_depth(depth + 1) {
-                return true;
+        } else {
+            // recursively check other numbers to explode/reduce
+            if self.pair_left.is_some() {
+                let (reduced, mut exploded) = self.pair_left.as_mut().unwrap().reduce_with_depth(depth + 1);
+                if reduced {
+                    if exploded.is_some() && self.pair_right.as_ref().unwrap().regular_number.is_some() {
+                        let previous_right = self.pair_right.as_ref().unwrap().regular_number.unwrap();
+                        let right_to_add = exploded.unwrap().1;
+                        self.pair_right.as_mut().unwrap().regular_number = Some(previous_right + right_to_add);
+                        exploded.as_mut().unwrap().1 = 0;
+                    }
+                    return (true, exploded);
+                }
             }
-        }
-        if self.pair_right.is_some() {
-            let to_reduce = self.pair_right.as_mut().unwrap();
-            if to_reduce.reduce_with_depth(depth + 1) {
-                return true;
+            if self.pair_right.is_some() {
+                let (reduced, mut exploded) = self.pair_right.as_mut().unwrap().reduce_with_depth(depth + 1);
+                if reduced {
+                    if exploded.is_some() && self.pair_left.as_ref().unwrap().regular_number.is_some() {
+                        let previous_left = self.pair_left.as_ref().unwrap().regular_number.unwrap();
+                        let left_to_add = exploded.unwrap().0;
+                        self.pair_left.as_mut().unwrap().regular_number = Some(previous_left + left_to_add);
+                        exploded.as_mut().unwrap().0 = 0;
+                    }
+                    return (true, exploded);
+                }
             }
         }
 
@@ -155,14 +133,17 @@ impl SnailfishNumber {
                 pair_right: None,
             }));
             self.regular_number = None;
-            return true;
+            return (true, None);
         }
 
-        false
+        (false, None)
     }
 
-    fn reduce(&mut self, ) {
-        while self.reduce_with_depth(0) { }
+    fn reduce(&mut self) {
+        let mut reduced = true;
+        while reduced {
+            (reduced, _) = self.reduce_with_depth(0);
+        }
     }
 
     fn magnitude(&self) -> u32 {
@@ -383,6 +364,7 @@ mod tests {
         for i in 0..examples.len() {
             let mut sn = SnailfishNumber::from_string(&String::from(examples[i]));
             sn.reduce();
+            println!("Trying {}", examples[i]);
             assert_eq!(sn.to_string(), solutions[i]);
         }
     }
