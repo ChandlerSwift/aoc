@@ -1,0 +1,5 @@
+*/*
+!*.rs
+
+# https://www.reddit.com/r/adventofcode/wiki/faqs/copyright/inputs/
+input.txt
