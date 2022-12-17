@@ -37,28 +37,28 @@ fn process(data: &str) -> u32 {
         let (x, y) = boundaries.pop_front().unwrap();
         let boundary_cost = costs[x][y];
 
-        if x > 0 && elevations[x-1][y] - elevations[x][y] <= 1 {
+        if x > 0 && elevations[x - 1][y] - elevations[x][y] >= 1 {
             let above_boundary_cost = &mut costs[x - 1][y];
             if *above_boundary_cost > boundary_cost + 1 {
                 *above_boundary_cost = boundary_cost + 1;
                 boundaries.push_back((x - 1, y));
             }
         }
-        if x < map_height - 1 && elevations[x+1][y] - elevations[x][y] <= 1 {
+        if x < map_height - 1 && elevations[x + 1][y] - elevations[x][y] <= 1 {
             let below_boundary_cost = &mut costs[x + 1][y];
             if *below_boundary_cost > boundary_cost + 1 {
                 *below_boundary_cost = boundary_cost + 1;
                 boundaries.push_back((x + 1, y));
             }
         }
-        if y > 0 && elevations[x][y-1] - elevations[x][y] <= 1 {
+        if y > 0 && elevations[x][y - 1] - elevations[x][y] <= 1 {
             let left_boundary_cost = &mut costs[x][y - 1];
             if *left_boundary_cost > boundary_cost + 1 {
                 *left_boundary_cost = boundary_cost + 1;
                 boundaries.push_back((x, y - 1));
             }
         }
-        if y < map_width - 1 && elevations[x][y+1] - elevations[x][y] <= 1 {
+        if y < map_width - 1 && elevations[x][y + 1] - elevations[x][y] <= 1 {
             let right_boundary_cost = &mut costs[x][y + 1];
             if *right_boundary_cost > boundary_cost + 1 {
                 *right_boundary_cost = boundary_cost + 1;
