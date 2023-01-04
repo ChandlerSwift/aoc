@@ -50,7 +50,7 @@ fn process(data: &str, rocks_to_fall: u64) -> u64 {
     }
     let mut seen_states: HashMap<([[bool; 7]; 10], usize), (u64, u64)> = HashMap::new();
     let mut jet_index = 0;
-    let mut height_offset: u64 = 0;
+    let mut height_offset = 0;
     while current_falling_rock < rocks_to_fall {
         let target_offset;
         if is_moving_sideways {
@@ -76,7 +76,7 @@ fn process(data: &str, rocks_to_fall: u64) -> u64 {
             if height_offset == 0 && height(&chamber) > 10 {
                 let mut foo = [[false; 7]; 10];
                 foo.clone_from_slice(&chamber[chamber.len() - 10..chamber.len()]);
-                let state: ([[bool; 7]; 10], usize) = (foo, jet_index);
+                let state = (foo, jet_index);
                 if seen_states.contains_key(&state) {
                     let remaining_falling_rocks = rocks_to_fall - current_falling_rock;
                     let rocks_fall_per_cycle = current_falling_rock - seen_states[&state].0;
@@ -96,7 +96,7 @@ fn process(data: &str, rocks_to_fall: u64) -> u64 {
             current_falling_rock += 1;
 
             for point in &rock_shapes[current_falling_rock as usize % 5] {
-                let h = height(&chamber) as usize;
+                let h = height(&chamber);
                 for _ in 0..h + 7 - chamber.len() {
                     chamber.push([false; 7]);
                 }
