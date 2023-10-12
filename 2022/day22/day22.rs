@@ -36,7 +36,8 @@ fn print_map(map: &Vec<Vec<Square>>, position: (i32, i32), orientation: (i32, i3
     }
 }
 
-// Note that this puts a single row of Void around the map, so that I don't overflow
+// Note that this puts a single row of Void around the map, so that we
+// don't overflow
 fn parse_map(data: &str) -> Vec<Vec<Square>> {
     let rows: Vec<_> = data.split('\n').collect();
     let max_width = rows.iter().map(|r| r.len()).max().unwrap(); // The first row won't necessarily be full-width, so find one that is
@@ -71,10 +72,9 @@ fn parse_directions(data: &str) -> Vec<(usize, Option<Rotation>)> {
     directions
 }
 
-fn process(data: &str) -> usize {
+fn process(data: &str, cube: bool) -> usize {
     let (map, directions) = data.split_once("\n\n").unwrap();
     let map = parse_map(map);
-
     let directions = parse_directions(directions);
 
     let mut pos = (
@@ -82,23 +82,137 @@ fn process(data: &str) -> usize {
         1,
     );
     let mut orientation = (1, 0); // facing right
-                                  // print_map(&map, pos, orientation);
+
     for (distance, rotation) in directions {
         for _ in 0..distance {
-            let mut target_pos = (pos.0 + orientation.0, pos.1 - orientation.1); // TODO: overflow? Could just make map bigger
+            // We can do this because the map has a one-cell buffer on
+            // each edge, so we won't have any out-of-bounds-ness here.
+            let mut target_pos = (pos.0 + orientation.0, pos.1 - orientation.1);
+            let mut target_orientation = orientation.clone();
+
             if map[target_pos.1 as usize][target_pos.0 as usize] == Square::Void {
-                loop {
-                    let next_target_pos =
-                        (target_pos.0 - orientation.0, target_pos.1 + orientation.1);
-                    if map[next_target_pos.1 as usize][next_target_pos.0 as usize] == Square::Void {
-                        break;
+                if cube {
+                    // Unfortunately, I haven't managed to find a way
+                    // to generalize this problem, so we're going to
+                    // end up hardcoding a bunch of things
+                    // here. Beyond just being a bit ugly and
+                    // non-generalizable, this also means my test case
+                    // won't work, since that uses a different cube
+                    // net.
+                    //
+                    // That said, here's some more neat looking cube
+                    // nets I drew!
+                    //     ┌─1─┐
+                    //     3   2
+                    // ┌─3─┼───┼─2─┬─1─┐
+                    // 4   │   │   │   4
+                    // └─5─┼───┼─7─┴─6─┘
+                    //     5   7
+                    //     └─6─┘
+                    // ┌───┬───┬───┐
+                    // │   │   │   │
+                    // └───┴───┼───┼───┬───┐
+                    //         │   │   │   │
+                    //         └───┴───┴───┘
+                    //
+                    // All the numbers are slightly different than
+                    // they'd otherwise be since I have an extra
+                    // padding square surrounding the board.
+                    //
+                    // Here's the shape we'll be using, with connected
+                    // sides labeled:
+                    //       ┌─1─┬─2─┐
+                    //       6   │   3
+                    //       ├───┼─4─┘
+                    //       7   4
+                    //   ┌─7─┼───┤
+                    //   6   │   3
+                    //   ├───┼─5─┘
+                    //   1   5
+                    //   └─2─┘
+                    //
+                    match target_pos {
+                        // side labeled 1
+                        (x, 0) if x > 50 && x <= 100 => {
+                            target_pos = (1, x + 100);
+                            target_orientation = (1, 0);
+                        }
+                        (0, y) if y > 150 && y <= 200 => {
+                            target_pos = (y - 100, 1);
+                            target_orientation = (0, -1);
+                        }
+                        // 2
+                        (x, 0) if x > 100 && x <= 150 => {
+                            target_pos = (x - 100, 200);
+                            // orientation unchanged
+                        }
+                        (x, 201) if x > 0 && x <= 50 => {
+                            target_pos = (x + 100, 1);
+                            // orientation unchanged
+                        }
+                        // 3
+                        (151, y) if y > 0 && y <= 50 => {
+                            target_pos = (100, 151 - y);
+                            target_orientation = (-1, 0);
+                        }
+                        (101, y) if y > 100 && y <= 150 => {
+                            target_pos = (150, 151 - y);
+                            target_orientation = (-1, 0);
+                        }
+                        // 4
+                        (x, 51) if x > 100 && x <= 150 => {
+                            target_pos = (100, x - 50);
+                            target_orientation = (-1, 0);
+                        }
+                        (101, y) if y > 50 && y <= 100 => {
+                            target_pos = (y + 50, 50);
+                            target_orientation = (0, 1);
+                        }
+                        // 5
+                        (x, 151) if x > 50 && x <= 100 => {
+                            target_pos = (50, 100 + x);
+                            target_orientation = (-1, 0);
+                        }
+                        (51, y) if y > 150 && y <= 200 => {
+                            target_pos = (y - 100, 150);
+                            target_orientation = (0, 1);
+                        }
+                        // 6
+                        (0, y) if y > 100 && y <= 150 => {
+                            target_pos = (51, 151 - y);
+                            target_orientation = (1, 0);
+                        }
+                        (50, y) if y > 0 && y <= 50 => {
+                            target_pos = (1, 151 - y);
+                            target_orientation = (1, 0);
+                        }
+                        // 7
+                        (x, 100) if x > 0 && x <= 50 => {
+                            target_pos = (51, x + 50);
+                            target_orientation = (1, 0);
+                        }
+                        (50, y) if y > 50 && y <= 100 => {
+                            target_pos = (y - 50, 101);
+                            target_orientation = (0, -1);
+                        }
+                        _ => panic!("I haven't handled this case: {:?}", target_pos),
                     }
-                    target_pos = next_target_pos;
+                } else {
+                    loop {
+                        let next_target_pos =_pos.0 - orientation.0, target_pos.1 + orientation.1);
+                        if map[next_target_pos.1 as usize][next_target_pos.0 as usize] == Square::Void {
+                            break;
+                        }
+                        target_pos = next_target_pos;
+                    }
                 }
             }
             match map[target_pos.1 as usize][target_pos.0 as usize] {
                 Square::Wall => (),
-                Square::Space => pos = target_pos,
+                Square::Space => {
+                    pos = target_pos;
+                    orientation = target_orientation;
+                }
                 Square::Void => panic!("Square is still Void; we just fixed this!"),
             }
         }
@@ -107,8 +221,6 @@ fn process(data: &str) -> usize {
             Some(Rotation::Clockwise) => (orientation.1, -orientation.0),
             Some(Rotation::CounterClockwise) => (-orientation.1, orientation.0),
         };
-        // println!("{}, {:?}", distance, rotation);
-        // print_map(&map, pos, orientation);
     }
     let orientation_val = match orientation {
         (1, 0) => 0,
@@ -123,8 +235,7 @@ fn process(data: &str) -> usize {
 fn main() {
     let data = fs::read_to_string("input.txt").unwrap();
     let data = data.trim_end(); // There's some intentional whitespace at the beginning
-
-    println!("{}", process(data));
+    println!("{}", process(data, true));
 }
 
 #[cfg(test)]
@@ -164,6 +275,11 @@ mod test {
 
     #[test]
     fn test_part1() {
-        assert_eq!(process(DATA), 6032);
+        assert_eq!(process(DATA, false), 6032);
+    }
+
+    #[test]
+    fn test_part2() {
+        assert_eq!(process(DATA, true), 5031);
     }
 }
